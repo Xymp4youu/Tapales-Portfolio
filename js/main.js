@@ -1,3 +1,19 @@
+// ===== Theme toggle =====
+const html = document.documentElement;
+const themeBtn = document.getElementById('themeBtn');
+
+const savedTheme = localStorage.getItem('theme');
+if (savedTheme) html.setAttribute('data-theme', savedTheme);
+
+themeBtn?.addEventListener('click', () => {
+  html.classList.add('theme-transitioning');
+  setTimeout(() => html.classList.remove('theme-transitioning'), 400);
+
+  const next = html.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
+  html.setAttribute('data-theme', next);
+  localStorage.setItem('theme', next);
+});
+
 // ===== Navbar scroll state =====
 const nav = document.getElementById('nav');
 const navLinks = document.querySelectorAll('.nav-links a');
