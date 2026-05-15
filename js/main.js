@@ -47,3 +47,60 @@ navLinks.forEach(a => a.addEventListener('click', () => {
 window.addEventListener('resize', () => {
   if (window.innerWidth > 960) navLinksEl.classList.remove('open');
 }, { passive: true });
+
+// ===== Cord wave animation (cross-browser, matches swing timing) =====
+const cordPath = document.querySelector('.cord-path');
+if (cordPath) {
+  const PERIOD = 5000; // must match swing CSS duration (5s)
+  function animateCord(ts) {
+    const t = (ts % PERIOD) / PERIOD;
+    // cosine gives 1→-1→1, matching swing phase: card left = cord curves right
+    const cx = 5 + 3 * Math.cos(2 * Math.PI * t);
+    cordPath.setAttribute('d', `M5,0 Q${cx.toFixed(2)},14 5,28`);
+    requestAnimationFrame(animateCord);
+  }
+  requestAnimationFrame(animateCord);
+}
+
+// ===== ID Card 3D tilt (Readymag style) =====
+const idCard = document.querySelector('.id-card');
+const idWrap = document.querySelector('.id-wrap');
+
+if (idCard && idWrap) {
+  const shine = document.createElement('div');
+  shine.className = 'id-shine';
+  idCard.appendChild(shine);
+
+  idCard.addEventListener('mouseenter', () => {
+    idWrap.classList.add('tilting');
+  });
+
+  idCard.addEventListener('mousemove', (e) => {
+    const rect = idCard.getBoundingClientRect();
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top + rect.height / 2;
+    const dx = (e.clientX - cx) / (rect.width / 2);
+    const dy = (e.clientY - cy) / (rect.height / 2);
+
+    const rotX = -dy * 14;
+    const rotY = dx * 14;
+
+    idCard.style.transform = `perspective(700px) rotateX(${rotX}deg) rotateY(${rotY}deg) scale(1.04)`;
+    idCard.style.boxShadow = `
+      ${-rotY * 1.5}px ${rotX * 1.5}px 60px rgba(0,0,0,0.7),
+      0 0 0 1px rgba(245,200,0,0.5)
+    `;
+
+    const sx = ((dx + 1) / 2) * 100;
+    const sy = ((dy + 1) / 2) * 100;
+    shine.style.background = `radial-gradient(circle at ${sx}% ${sy}%, rgba(255,255,255,0.2) 0%, transparent 65%)`;
+    shine.style.opacity = '1';
+  });
+
+  idCard.addEventListener('mouseleave', () => {
+    idWrap.classList.remove('tilting');
+    idCard.style.transform = '';
+    idCard.style.boxShadow = '';
+    shine.style.opacity = '0';
+  });
+}

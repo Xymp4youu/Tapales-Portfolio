@@ -342,14 +342,16 @@ body::after {
   z-index: 10;
 }
 .id-cord {
-  width: 3px;
-  height: 18px;
-  background: linear-gradient(to bottom, #999, #c8c0b8, #a0988e, #c8c0b8, #999);
-  border-radius: 2px;
+  display: block;
+  width: 10px;
+  height: 28px;
   margin: 0 auto;
   position: relative;
   z-index: 9;
-  box-shadow: 0 0 4px rgba(0,0,0,0.4);
+  overflow: visible;
+}
+.cord-path {
+  filter: drop-shadow(0 0 2px rgba(0,0,0,0.35));
 }
 .id-card {
   width: 260px;
@@ -363,6 +365,21 @@ body::after {
     0 0 0 1px rgba(245,200,0,0.4),
     inset 0 1px 0 rgba(255,255,255,0.15);
   position: relative;
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+  will-change: transform;
+  cursor: pointer;
+}
+.id-shine {
+  position: absolute;
+  inset: 0;
+  border-radius: 7px;
+  opacity: 0;
+  transition: opacity 0.25s ease;
+  pointer-events: none;
+  z-index: 10;
+}
+.id-wrap.tilting {
+  animation-play-state: paused;
 }
 /* Gloss overlay */
 .id-card::before {
