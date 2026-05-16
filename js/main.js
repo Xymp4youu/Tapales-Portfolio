@@ -78,6 +78,271 @@ if (cordPath) {
   requestAnimationFrame(animateCord);
 }
 
+// ===== Dynamic Island Music Player =====
+(function () {
+  const audio    = document.getElementById('diAudio');
+  const player   = document.getElementById('diPlayer');
+  const seek     = document.getElementById('diSeek');
+  const vol      = document.getElementById('diVol');
+  const muteBtn  = document.getElementById('diMute');
+  const likeBtn  = document.getElementById('diLike');
+  const closeBtn = document.getElementById('diClose');
+  const prevBtn  = document.getElementById('diPrev');
+  const nextBtn  = document.getElementById('diNext');
+  const currentEl  = document.getElementById('diCurrent');
+  const durationEl = document.getElementById('diDuration');
+  const hint     = document.getElementById('diHint');
+  const ring     = document.getElementById('diRing');
+  const playBtns = document.querySelectorAll('.di-play-btn');
+
+  if (!audio || !player) return;
+
+  let playing = false;
+  let muted   = false;
+  let firstClick = false;
+
+  function syncRing() {
+    if (!ring) return;
+    ring.classList.toggle('pulsing', playing && !player.classList.contains('di-open'));
+  }
+  let autoCloseTimer;
+
+  audio.volume = 0.7;
+
+  // Try autoplay immediately — works if browser permits it
+  audio.play().then(() => {
+    playing = true;
+    firstClick = true;
+    player.classList.add('playing');
+    syncRing();
+    document.removeEventListener('click', handleFirstInteraction);
+    document.removeEventListener('keydown', handleFirstInteraction);
+    document.removeEventListener('touchstart', handleFirstInteraction);
+  }).catch(() => {
+    // Autoplay blocked — fall back to first-interaction
+  });
+
+  // Slide in after 1.5s; only show hint if autoplay was blocked
+  setTimeout(() => {
+    player.classList.add('di-visible');
+    if (!firstClick) setTimeout(() => hint?.classList.add('di-hint-show'), 800);
+  }, 1500);
+
+  // First user interaction → start playing (fallback)
+  function handleFirstInteraction() {
+    if (firstClick) return;
+    firstClick = true;
+    document.removeEventListener('click', handleFirstInteraction);
+    document.removeEventListener('keydown', handleFirstInteraction);
+    document.removeEventListener('touchstart', handleFirstInteraction);
+    hint?.classList.remove('di-hint-show');
+    hint?.classList.add('di-hint-hide');
+    startPlay();
+  }
+  document.addEventListener('click', handleFirstInteraction);
+  document.addEventListener('keydown', handleFirstInteraction);
+  document.addEventListener('touchstart', handleFirstInteraction, { passive: true });
+
+  function startPlay() {
+    audio.play().then(() => {
+      playing = true;
+      player.classList.add('playing');
+      syncRing();
+    }).catch(() => {});
+  }
+
+  function setPlaying(state) {
+    playing = state;
+    player.classList.toggle('playing', state);
+    if (state) audio.play().catch(() => {}); else audio.pause();
+    syncRing();
+  }
+
+  // Click compact circle → expand
+  function openIsland() {
+    player.classList.add('di-open');
+    syncRing();
+    clearTimeout(autoCloseTimer);
+    autoCloseTimer = setTimeout(closeIsland, 8000);
+  }
+  function closeIsland() {
+    player.classList.remove('di-open');
+    syncRing();
+    clearTimeout(autoCloseTimer);
+  }
+
+  player.addEventListener('click', () => {
+    if (!player.classList.contains('di-open')) openIsland();
+  });
+
+  // Click outside → collapse
+  document.addEventListener('click', e => {
+    if (player.classList.contains('di-open') && !player.contains(e.target)) closeIsland();
+  });
+
+  // Play buttons (compact + expanded)
+  playBtns.forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      if (!firstClick) { handleFirstInteraction(); return; }
+      setPlaying(!playing);
+      clearTimeout(autoCloseTimer);
+      autoCloseTimer = setTimeout(closeIsland, 8000);
+    });
+  });
+
+  // Progress bar
+  audio.addEventListener('timeupdate', () => {
+    if (!audio.duration) return;
+    const pct = (audio.currentTime / audio.duration) * 100;
+    if (seek) {
+      seek.value = pct;
+      seek.style.background = `linear-gradient(to right,var(--sp-green) ${pct}%,rgba(255,255,255,0.15) ${pct}%)`;
+    }
+    if (currentEl) currentEl.textContent = fmtTime(audio.currentTime);
+  });
+  audio.addEventListener('loadedmetadata', () => {
+    if (durationEl) durationEl.textContent = fmtTime(audio.duration);
+  });
+
+  // Seek
+  seek?.addEventListener('input', e => {
+    e.stopPropagation();
+    if (audio.duration) audio.currentTime = (seek.value / 100) * audio.duration;
+    seek.style.background = `linear-gradient(to right,var(--sp-green) ${seek.value}%,rgba(255,255,255,0.15) ${seek.value}%)`;
+  });
+
+  // Volume
+  if (vol) vol.style.background = 'linear-gradient(to right,var(--sp-green) 70%,rgba(255,255,255,0.15) 70%)';
+  vol?.addEventListener('input', e => {
+    e.stopPropagation();
+    audio.volume = vol.value / 100;
+    vol.style.background = `linear-gradient(to right,var(--sp-green) ${vol.value}%,rgba(255,255,255,0.15) ${vol.value}%)`;
+    if (audio.volume > 0 && muted) { muted = false; audio.muted = false; syncMute(); }
+  });
+
+  // Mute
+  function syncMute() {
+    const v = muteBtn?.querySelector('.di-vol-icon');
+    const m = muteBtn?.querySelector('.di-muted-icon');
+    if (v) v.style.display = muted ? 'none' : '';
+    if (m) m.style.display = muted ? '' : 'none';
+  }
+  muteBtn?.addEventListener('click', e => {
+    e.stopPropagation();
+    muted = !muted; audio.muted = muted; syncMute();
+  });
+
+  // Like
+  likeBtn?.addEventListener('click', e => {
+    e.stopPropagation();
+    likeBtn.classList.toggle('liked');
+  });
+
+  // Prev / Next (single track — restart)
+  prevBtn?.addEventListener('click', e => { e.stopPropagation(); audio.currentTime = 0; });
+  nextBtn?.addEventListener('click', e => { e.stopPropagation(); audio.currentTime = 0; });
+
+  // Close
+  closeBtn?.addEventListener('click', e => {
+    e.stopPropagation();
+    setPlaying(false);
+    player.classList.remove('di-visible', 'di-open');
+    hint?.classList.remove('di-hint-show');
+    clearTimeout(autoCloseTimer);
+  });
+
+  // Drag to reposition (mouse + touch)
+  let dragStartX, dragStartY, origLeft, origTop, isDragging = false;
+
+  function startDrag(clientX, clientY) {
+    const rect = player.getBoundingClientRect();
+    dragStartX = clientX;
+    dragStartY = clientY;
+    origLeft   = rect.left;
+    origTop    = rect.top;
+    isDragging = false;
+    return rect;
+  }
+
+  function moveDrag(clientX, clientY, rect) {
+    const dx = clientX - dragStartX;
+    const dy = clientY - dragStartY;
+    if (!isDragging && Math.abs(dx) < 6 && Math.abs(dy) < 6) return;
+    isDragging = true;
+    player.classList.add('di-dragging');
+    const maxX   = window.innerWidth  - rect.width;
+    const maxY   = window.innerHeight - rect.height;
+    const newLeft = Math.max(0, Math.min(maxX, origLeft + dx));
+    const newTop  = Math.max(0, Math.min(maxY, origTop  + dy));
+    player.style.right     = 'auto';
+    player.style.bottom    = 'auto';
+    player.style.left      = newLeft + 'px';
+    player.style.top       = newTop  + 'px';
+    player.style.transform = 'none';
+    if (ring) {
+      ring.style.right  = 'auto';
+      ring.style.bottom = 'auto';
+      ring.style.left   = newLeft + 'px';
+      ring.style.top    = newTop  + 'px';
+    }
+    if (hint) {
+      hint.style.bottom    = 'auto';
+      hint.style.right     = 'auto';
+      hint.style.left      = newLeft + 'px';
+      hint.style.top       = (newTop - 44) + 'px';
+      hint.style.transform = 'none';
+    }
+  }
+
+  // Mouse drag
+  player.addEventListener('mousedown', e => {
+    if (e.target.closest('button, input')) return;
+    const rect = startDrag(e.clientX, e.clientY);
+
+    function onMove(e)  { moveDrag(e.clientX, e.clientY, rect); }
+    function onUp()     {
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+      setTimeout(() => { isDragging = false; }, 0);
+      player.classList.remove('di-dragging');
+    }
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  });
+
+  // Touch drag
+  player.addEventListener('touchstart', e => {
+    if (e.target.closest('button, input')) return;
+    const t = e.touches[0];
+    const rect = startDrag(t.clientX, t.clientY);
+
+    function onTouchMove(e) {
+      const t = e.touches[0];
+      moveDrag(t.clientX, t.clientY, rect);
+      if (isDragging) e.preventDefault();
+    }
+    function onTouchEnd() {
+      player.removeEventListener('touchmove', onTouchMove);
+      player.removeEventListener('touchend', onTouchEnd);
+      setTimeout(() => { isDragging = false; }, 0);
+      player.classList.remove('di-dragging');
+    }
+    player.addEventListener('touchmove', onTouchMove, { passive: false });
+    player.addEventListener('touchend', onTouchEnd);
+  }, { passive: true });
+
+  // Prevent click-to-open firing after a drag
+  player.addEventListener('click', e => {
+    if (isDragging) e.stopImmediatePropagation();
+  }, true);
+
+  function fmtTime(s) {
+    if (!s || isNaN(s)) return '0:00';
+    return `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+  }
+})();
+
 // ===== ID Card 3D tilt (Readymag style) =====
 const idCard = document.querySelector('.id-card');
 const idWrap = document.querySelector('.id-wrap');
